@@ -143,7 +143,7 @@ class DefendMap:
         self.len_x = img.len_x
         self.len_y = img.len_y
         self.img = img
-        self.i_right = [[False for _ in range(img.len_y)] for _ in range(img.len_x)]
+        self.i_right = [[True for _ in range(img.len_y)] for _ in range(img.len_x)]
     def getpixel(self, x:int, y:int) -> tuple[int, int, int]:
         if(not self.is_defended(x, y)):
             return (-1, -1, -1)
@@ -185,7 +185,6 @@ def add_image(start_x:int, start_y:int, img:MagicImage):
                 start_y + j
             )
             if((br, bg, bb) == (r, g, b)):
-                defend_map.right(start_x + i, start_y + j, True)
                 continue
             work_list.add_work(
                 PaintWork(
