@@ -1,0 +1,7 @@
+_save_login_data.py
+save/
+.magic/
+__pycache__/
+token.json
+*.png
+*.json*
