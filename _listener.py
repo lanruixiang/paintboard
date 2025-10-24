@@ -69,7 +69,7 @@ def on_open_forever():
                 break
         # if paint_list.size() / 10 > 100:
         #     print("[WARN] ", end="")
-        print(f"全局绘画消息：{paint_list.size() / 5} 条 / 2s")
+        print(f"全局绘画消息：{paint_list.size() / 2.5} 条 / 4s")
         time.sleep(1)
 
 def on_open(ws):
