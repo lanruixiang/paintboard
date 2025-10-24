@@ -293,7 +293,7 @@ def work_submitter():
         wk = work_list.get_work()
         if(wk):
             draw_a_point(wk)
-        time.sleep(1 / token_count)
+        time.sleep(4 / token_count)
 
 def on_open(ws):
     global executor, START_X, START_Y, img
