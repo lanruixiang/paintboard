@@ -202,6 +202,14 @@ count = 0
 
 # ---------------------- 创建 WebSocketApp -------------------
 
+# 时间
+
+def gettime() -> str:
+    tm = time.time()
+    local_time = time.localtime(tm)
+    res = time.strftime("%Y-%m-%d %H:%M:%S", local_time)
+    return res
+
 buffer = bytearray()
 sender_buffer = bytearray()
 
@@ -264,7 +272,7 @@ def on_message(ws, message):
             if(status_code != SUCCESS):
                 item = sended[id]
                 work_list.add_work(item, True)
-            print(f"receive painting result: [id={id} status_code={status_code}]")
+            print(f"[{gettime()}] receive painting result: [id={id} status_code={status_code}]")
             del(buffer[0:6])
 
 # 发送消息
@@ -281,7 +289,7 @@ def sender(ws):
                 data_size = f"{packet_size}B"
             else:
                 data_size = f"{packet_size / 1024}KB"
-            print(f"已发送 {data_size} 的数据")
+            print(f"[{gettime()}] 已发送 {data_size} 的数据")
             del sender_buffer[0:packet_size]
         time.sleep(SEND_INTERVAL)
 
@@ -295,24 +303,12 @@ def work_submitter():
             draw_a_point(wk)
         time.sleep(4 / token_count)
 
-def print_time():
-    last = None
-    while(True):
-        tm = time.time()
-        local_tm = time.localtime(tm)
-        s = time.strftime("[%m-%d %H:%M]", local_tm)
-        if(s != last):
-            last = s
-            print(s)
-        time.sleep(10)
-
 def on_open(ws):
     global executor, START_X, START_Y, img
-    print("连接成功")
+    print(f"[{gettime()}] 连接成功")
     executor.submit(sender, ws)
     executor.submit(work_submitter)
     executor.submit(add_image, START_X, START_Y, img)
-    executor.submit(print_time)
 
 app = websocket.WebSocketApp(
     WS_URL,
@@ -326,7 +322,7 @@ def main():
     global token_pool, defend_map, app, START_X, START_Y, img
     
     # 读取 AccessKey 列表
-    print("正在读取 token 列表")
+    print(f"[{gettime()}] 正在读取 token 列表")
     access_key_list = []
     with open("token.json", "r", encoding="utf-8") as f:
         data = json.loads(f.read())
@@ -334,15 +330,15 @@ def main():
         access_key_list.append((user["uid"], user["access_key"]))
 
     # 获取 token
-    print("正在获取 token")
+    print(f"[{gettime()}] 正在获取 token")
     for uid, access_key in access_key_list:
         token = get_token(uid, access_key)
         if(token):
             token_pool.add_token(uid, token)
-    print(f"已获取 {token_pool.count()} 个 token")
+    print(f"[{gettime()}] 已获取 {token_pool.count()} 个 token")
 
     # 处理图片
-    print("正在处理图片")
+    print(f"[{gettime()}] 正在处理图片")
     START_X, START_Y = (860, 139)
     img = read_image("fnn.png", 60, 100)
     defend_map.set_img(START_X, START_Y, img)
