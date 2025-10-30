@@ -24,7 +24,7 @@ NO_PERMISSION = 0xEB          # 无权限
 SERVER_ERROR = 0xEA           # 服务器错误
 
 MAX_PACKETS_PER_SECOND = 256
-SEND_INTERVAL = 1 / MAX_PACKETS_PER_SECOND  # 1.1 秒最多发送 256 个包，防止波动导致连接断开
+SEND_INTERVAL = 1.1 / MAX_PACKETS_PER_SECOND  # 1.1 秒最多发送 256 个包，防止波动导致连接断开
 MAX_PACKET_SIZE = 32 * 1024                   # 单位字节
 
 # ------------------------ 自定义队列/双端队列 ------------------------------

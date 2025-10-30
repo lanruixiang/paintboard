@@ -279,6 +279,9 @@ def on_message(ws, message):
 def sender(ws):
     global sender_buffer
     while(True):
+        if not ws.sock or not ws.sock.connected:
+            print("连接已断开，任务结束")
+            break
         packet_size = min(len(sender_buffer), MAX_PACKET_SIZE)
         if(packet_size != 0):
             ws.send(
@@ -294,32 +297,29 @@ def sender(ws):
         time.sleep(SEND_INTERVAL)
 
 # 提交任务到发送列表
-def work_submitter():
+def work_submitter(ws):
     global work_list, token_pool
     token_count = token_pool.count()
     while(True):
+        if not ws.sock or not ws.sock.connected:
+            print("连接已断开，任务结束")
+            break
         wk = work_list.get_work()
         if(wk):
             draw_a_point(wk)
-        time.sleep(4 / token_count)
+        time.sleep(0.01 / token_count)
 
 def on_open(ws):
     global executor, START_X, START_Y, img
     print(f"[{gettime()}] 连接成功")
     executor.submit(sender, ws)
-    executor.submit(work_submitter)
+    executor.submit(work_submitter, ws)
     executor.submit(add_image, START_X, START_Y, img)
-
-app = websocket.WebSocketApp(
-    WS_URL,
-    on_message=on_message,
-    on_open=on_open
-)
 
 # ------------------------------------------------------------
 
 def main():
-    global token_pool, defend_map, app, START_X, START_Y, img
+    global token_pool, defend_map, app, START_X, START_Y, img, WS_URL
     
     # 读取 AccessKey 列表
     print(f"[{gettime()}] 正在读取 token 列表")
@@ -339,11 +339,21 @@ def main():
 
     # 处理图片
     print(f"[{gettime()}] 正在处理图片")
-    START_X, START_Y = (860, 139)
-    img = read_image("fnn.png", 60, 100)
+    START_X, START_Y = (300, 200)
+    img = read_image("duili.png", 140, 140)
     defend_map.set_img(START_X, START_Y, img)
     
-    app.run_forever()
+    while(True):
+        app = websocket.WebSocketApp(
+            WS_URL,
+            on_message=on_message,
+            on_open=on_open
+        )
+        try:
+            app.run_forever()
+        except Exception as e:
+            print(f"[{gettime()}] 已断连，尝试重连")
+        time.sleep(5)
 
 if __name__ == "__main__":
     main()
