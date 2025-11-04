@@ -1,16 +1,18 @@
 import time
+import random
 import requests
 import websocket
 import json
 from PIL import Image
-import pickle
 from concurrent.futures import ThreadPoolExecutor
 from _magic import *
 # -----------------------------------------------------------
 
-START_X = 0
-START_Y = 0
-img = None
+IMAGE_LIST = [
+    ("m7.png", 550, 0, 150, 150),
+]
+
+CD = 50
 
 # ------------------- 创建线程池    -------------------------
 
@@ -84,7 +86,7 @@ class PaintWork:
 
 class WorkList:
     def __init__(self):
-        self.work_list = Deque(100000)
+        self.work_list = Deque(500000)
     def add_work(self, work:PaintWork, is_front:bool=False):
         if(is_front):
             self.work_list.push_front(work)
@@ -103,9 +105,9 @@ work_list = WorkList()
 
 class MagicImage:
     def __init__(self, x:int, y:int):
-        self.r = [[0 for _ in range(y)] for _ in range(x)]
-        self.g = [[0 for _ in range(y)] for _ in range(x)]
-        self.b = [[0 for _ in range(y)] for _ in range(x)]
+        self.r = [[None for _ in range(y)] for _ in range(x)]
+        self.g = [[None for _ in range(y)] for _ in range(x)]
+        self.b = [[None for _ in range(y)] for _ in range(x)]
         self.len_x = x
         self.len_y = y
     def setpixel(self, x:int, y:int, r:int, g:int, b:int):
@@ -114,61 +116,67 @@ class MagicImage:
         self.b[x][y] = b
     def getpixel(self, x:int, y:int) -> tuple[int, int, int]:
         return (self.r[x][y], self.g[x][y], self.b[x][y])
+    def insert_image(self, image:"MagicImage", start_x:int, start_y:int):
+        for x in range(image.len_x):
+            for y in range(image.len_y):
+                r, g, b = image.getpixel(x, y)
+                self.setpixel(x + start_x, y + start_y, r, g, b)
 
 def read_image(path:str, x:int, y:int) -> MagicImage:
-    img = Image.open(path).convert("RGB")
-    img = img.resize((x, y), resample=Image.LANCZOS)
-    
+    if(path != "RANDOM"):
+        img = Image.open(path).convert("RGB")
+        img = img.resize((x, y), resample=Image.LANCZOS)
+        
     res = MagicImage(x, y)
     for i in range(0, x):
         for j in range(0, y):
-            r, g, b = img.getpixel((i, j))
+            if(path != "RANDOM"):
+                r, g, b = img.getpixel((i, j))
+            else:
+                r = random.randint(0, 255)
+                g = random.randint(0, 255)
+                b = random.randint(0, 255)
             res.setpixel(i, j, r, g, b)
-
+                
     return res
 
-# ---------------------- 从图片创建映射用于维护 -----------------------
+# ---------------------- 创建整个板面的绘画图片 -----------------------
+
+all_board = MagicImage(1000, 600)
+
+# ---------------------- 从总版面创建维护表 -----------------------
 
 class DefendMap:
     def __init__(self):
-        self.start_x = 0
-        self.start_y = 0
-        self.len_x = 0
-        self.len_y = 0
-        self.img = None
+        self.board = None
         self.i_right = None
-    def set_img(self, start_x:int, start_y:int, img:MagicImage):
-        self.start_x = start_x
-        self.start_y = start_y
-        self.len_x = img.len_x
-        self.len_y = img.len_y
-        self.img = img
-        self.i_right = [[True for _ in range(img.len_y)] for _ in range(img.len_x)]
+    def set_img(self, board:MagicImage):
+        self.board = board
+        self.i_right = [[True for _ in range(600)] for _ in range(1000)]
     def getpixel(self, x:int, y:int) -> tuple[int, int, int]:
         if(not self.is_defended(x, y)):
             return (-1, -1, -1)
-        return self.img.getpixel(x - self.start_x, y - self.start_y)
+        return self.board.getpixel(x, y)
     def is_defended(self, x:int, y:int) -> bool:
-        if(x < self.start_x or x >= self.start_x + self.len_x):
-            return False
-        if(y < self.start_y or y >= self.start_y + self.len_y):
+        r, g, b = self.board.getpixel(x, y)
+        if((r, g, b) == (None, None, None)):
             return False
         return True
     def is_right(self, x:int, y:int) -> bool:
         if(not self.is_defended(x, y)):
             return True
-        return self.i_right[x - self.start_x][y - self.start_y]
+        return self.i_right[x][y]
     def right(self, x:int, y:int, op:bool):
         if(not self.is_defended(x, y)):
             return
-        self.i_right[x - self.start_x][y - self.start_y] = op
+        self.i_right[x][y] = op
 
 defend_map = DefendMap()
         
 # --------------------- 将图片加入任务列表 ----------------------------
 
-def add_image(start_x:int, start_y:int, img:MagicImage):
-    global work_list, defend_map
+def add_image():
+    global work_list, defend_map, all_board
 
     time.sleep(2)
 
@@ -177,21 +185,16 @@ def add_image(start_x:int, start_y:int, img:MagicImage):
     board = get_board()
     cnt = 0
 
-    for j in range(img.len_y):
-        for i in range(img.len_x):
-            r, g, b = img.getpixel(i, j)
-            br, bg, bb = board.get_rgb(
-                start_x + i,
-                start_y + j
-            )
+    for j in range(600):
+        for i in range(1000):
+            if(not defend_map.is_defended(i, j)):
+                continue
+            r, g, b = all_board.getpixel(i, j)
+            br, bg, bb = board.get_rgb(i, j)
             if((br, bg, bb) == (r, g, b)):
                 continue
             work_list.add_work(
-                PaintWork(
-                    start_x + i,
-                    start_y + j,
-                    r, g, b
-                )
+                PaintWork(i, j, r, g, b)
             )
             cnt += 1
 
@@ -243,7 +246,7 @@ def handle_paint_message(x:int, y:int, new_r:int, new_g:int, new_b:int):
         defend_map.right(x, y, True)
     else:
         if(defend_map.is_right(x, y)):
-            work_list.add_work(PaintWork(x, y, r, g, b), True)
+            work_list.add_work(PaintWork(x, y, r, g, b), False)
         defend_map.right(x, y, False)
 
 # 接收消息
@@ -307,19 +310,26 @@ def work_submitter(ws):
         wk = work_list.get_work()
         if(wk):
             draw_a_point(wk)
-        time.sleep(0.01 / token_count)
+        time.sleep(CD / 1000 / token_count)
 
 def on_open(ws):
-    global executor, START_X, START_Y, img
+    global executor
     print(f"[{gettime()}] 连接成功")
     executor.submit(sender, ws)
     executor.submit(work_submitter, ws)
-    executor.submit(add_image, START_X, START_Y, img)
+    executor.submit(add_image)
 
-# ------------------------------------------------------------
+# ------------------------ 添加图片至任务 ----------------------------
+
+def add_image_to_work(filename:str, start_x:int, start_y:int, len_x:int, len_y:int):
+    global all_board
+    img = read_image(filename, len_x, len_y)
+    all_board.insert_image(img, start_x, start_y)
+
+# -------------------------------------------------------------------
 
 def main():
-    global token_pool, defend_map, app, START_X, START_Y, img, WS_URL
+    global token_pool, defend_map, app, START_X, START_Y, img, WS_URL, all_board
     
     # 读取 AccessKey 列表
     print(f"[{gettime()}] 正在读取 token 列表")
@@ -339,10 +349,12 @@ def main():
 
     # 处理图片
     print(f"[{gettime()}] 正在处理图片")
-    START_X, START_Y = (300, 200)
-    img = read_image("duili.png", 140, 140)
-    defend_map.set_img(START_X, START_Y, img)
     
+    for file, start_x, start_y, len_x, len_y in IMAGE_LIST:
+        add_image_to_work(file, start_x, start_y, len_x, len_y)
+
+    defend_map.set_img(all_board)
+
     while(True):
         app = websocket.WebSocketApp(
             WS_URL,
